@@ -1,0 +1,598 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>次回予約カレンダーリンク</title>
+<meta name="description" content="次回の予約の日時・店名・所要時間を入れてリンクを作ると、お客さんがそのリンクから自分のスマホのカレンダーに予定を入れられます。入力した内容はこの端末のブラウザで処理します。">
+<style>
+  :root {
+    --bg: #f3f7f6; --surface: #ffffff; --ink: #10201f; --ink2: #2f4442; --ink3: #4d605d;
+    --line: #cfdcda; --line-strong: #5f7673; --accent: #1F6F6A; --accent-ink: #ffffff; --accent-soft: #e2f1ef;
+    --danger: #a8231b; --danger-soft: #fbe9e7; --notice: #eaf0ef;
+    --font: "Hiragino Sans","Yu Gothic","BIZ UDPGothic","Noto Sans JP",system-ui,sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0e1716; --surface: #152120; --ink: #e9f3f1; --ink2: #c9d9d6; --ink3: #a5b9b5;
+      --line: #2b3d3b; --line-strong: #7d9692; --accent: #7FD1C7; --accent-ink: #06231f; --accent-soft: #183532;
+      --danger: #ff9a92; --danger-soft: #3a1f1c; --notice: #1a2826;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px; line-height: 1.6; }
+  main { max-width: 1080px; margin: 0 auto; padding: 16px 16px 32px; }
+  h1 { font-size: 22px; line-height: 1.3; margin: 8px 0 8px; }
+  h2 { font-size: 18px; line-height: 1.4; margin: 0 0 10px; overflow-wrap: anywhere; }
+  h3 { font-size: 16px; line-height: 1.4; margin: 0 0 8px; }
+  p { margin: 0 0 10px; }
+  .lead { color: var(--ink2); }
+  .notes { margin: 0 0 14px; padding-left: 1.2em; color: var(--ink2); font-size: 15px; }
+  .notes li { margin-bottom: 2px; }
+  .small { font-size: 14px; color: var(--ink3); }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px; margin-bottom: 14px; min-width: 0; }
+  label.f { display: block; font-weight: 600; margin: 0 0 4px; }
+  .hint { font-weight: 400; color: var(--ink3); font-size: 14px; }
+  input[type=text], input[type=date], input[type=time], select, textarea {
+    display: block; width: 100%; max-width: 100%; min-width: 0; min-height: 44px; font: inherit; font-size: 16px; color: var(--ink); background: var(--surface);
+    border: 1px solid var(--line-strong); border-radius: 6px; padding: 8px 10px; margin: 0 0 10px; -webkit-appearance: none; appearance: none; }
+  select { -webkit-appearance: menulist; appearance: auto; }
+  textarea { resize: vertical; }
+  input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible, a:focus-visible, summary:focus-visible {
+    outline: 3px solid var(--accent); outline-offset: 2px; }
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 0 10px; }
+  button, .btn { font: inherit; font-size: 16px; min-height: 44px; min-width: 44px; padding: 8px 14px; border-radius: 6px; border: 1px solid var(--line-strong);
+    background: var(--surface); color: var(--ink); cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; text-align: center; }
+  button.primary, .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .btns { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 10px; }
+  .stack { display: grid; gap: 10px; margin: 0 0 8px; }
+  .stack .btn, .stack button { width: 100%; min-height: 52px; font-size: 17px; }
+  .errors { border: 2px solid var(--danger); background: var(--danger-soft); border-radius: 8px; padding: 10px 12px; margin: 0 0 12px; color: var(--ink); }
+  .errors ul { margin: 4px 0 0; padding-left: 1.2em; }
+  .okmsg { color: var(--ink2); font-weight: 600; }
+  .urlbox { font-size: 14px; word-break: break-all; overflow-wrap: anywhere; }
+  .len { font-weight: 700; }
+  details > summary { cursor: pointer; min-height: 44px; display: flex; align-items: center; font-weight: 600; }
+  details ol, details ul { padding-left: 1.3em; margin: 4px 0 10px; }
+  /* 開く画面 */
+  .view { min-width: 0; }
+  .notice { background: var(--notice); border: 1px solid var(--line-strong); border-left: 6px solid var(--accent); border-radius: 6px; padding: 10px 12px; margin: 0 0 14px; font-size: 14px; color: var(--ink2); }
+  .v-shop { font-size: 20px; margin: 0 0 8px; }
+  .appt { background: var(--surface); border: 2px solid var(--accent); border-radius: 10px; padding: 14px 16px; margin: 0 0 14px; }
+  .appt .k { font-size: 14px; font-weight: 700; color: var(--ink3); margin: 0 0 2px; }
+  .appt .d { font-size: 24px; font-weight: 800; line-height: 1.3; margin: 0; overflow-wrap: anywhere; }
+  .appt .t { font-size: 22px; font-weight: 800; line-height: 1.35; margin: 0 0 4px; overflow-wrap: anywhere; }
+  .appt .n { border-top: 1px solid var(--line); margin: 10px 0 0; padding-top: 10px; color: var(--ink2); overflow-wrap: anywhere; }
+  .past { border: 2px solid var(--danger); background: var(--danger-soft); border-radius: 8px; padding: 8px 12px; margin: 0 0 12px; font-weight: 700; }
+  .assist { border: 1px dashed var(--line-strong); border-radius: 8px; padding: 12px; margin: 0 0 10px; background: var(--surface); }
+  .linklike { background: none; border: 0; color: var(--accent); text-decoration: underline; padding: 8px 0; min-height: 44px; }
+  .mw-footer { box-sizing: border-box; width: 100%; max-width: 100%; margin: 24px 0 0; padding: 16px; background: #F7F7F8;
+    border: 1px solid #D8D8DC; border-radius: 6px; color: #3A3A3E; font-family: system-ui, sans-serif; font-size: 12px; line-height: 1.7; }
+  .mw-footer p { margin: 0 0 6px; } .mw-footer p:last-child { margin-bottom: 0; } .mw-footer a { color: #0B5AA6; display: inline-block; padding: 13px 0; }
+  @media (min-width: 880px) {
+    .layout { display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); gap: 20px; align-items: start; }
+    .sticky { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+    .viewpage { max-width: 520px; margin: 0 auto; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div id="app"></div>
+  <footer class="mw-footer">
+    <p>みちAIワークス（MICHI AI WORKS）／代表 田中　泉</p>
+    <p>運営: <a href="https://michi-portfolio.vercel.app/" rel="noopener">みちAIワークス 公式サイト</a>（https://michi-portfolio.vercel.app/ ）／ お問い合わせ: <a href="mailto:nncf123nncf@gmail.com">nncf123nncf@gmail.com</a></p>
+    <p>入力した内容は、お使いの端末のブラウザで処理します。予約のリンクは、リンクを作ったお店が入力した内容を表示するだけで、当サイトは内容の確認や保証をしていません。このページから予約の受付・変更はできません。「Googleカレンダーに追加」を押すと、予定の内容がGoogleのページに渡ります。アクセス解析（Cloudflare Web Analytics）で、ページの閲覧状況（閲覧数・参照元・ブラウザの種類など）を計測しています。</p>
+    <p>ログイン・会員登録・パスワードの入力を求めることはありません。</p>
+  </footer>
+</main>
+
+<script id="core">
+var NV = (function () {
+  var KEY = 'next-visit-link-v1';
+  var LIM = { shop: 30, note: 80 };
+  var DURS = [15, 30, 45, 60, 75, 90, 120, 150, 180, 240];
+  var REMINDS = [
+    { label: 'なし', trigger: null },
+    { label: '前日の同じ時刻', trigger: '-P1D' },
+    { label: '2時間前', trigger: '-PT2H' },
+    { label: '1時間前', trigger: '-PT1H' }
+  ];
+  var HASH_MAX = 1000, DAY = 86400000, JST = 9 * 3600000;
+  var WD = ['日', '月', '火', '水', '木', '金', '土'];
+
+  function clean(s) { return String(s == null ? '' : s).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+  function cpLen(s) { return Array.from(s).length; }
+  function norm(s) {
+    return String(s).normalize('NFKC').toLowerCase()
+      .replace(/[\u00ad\u200b-\u200f\u2060-\u2064\ufeff]/g, '')
+      .replace(/[\u2010-\u2015\u2212\u30fc\uff70]/g, '-').replace(/[。｡]/g, '.');
+  }
+  // リンク・メールアドレス・電話番号らしい文字を見つける（お客さんの連絡先や外部への誘導を入れさせない）
+  function blockedReason(s) {
+    var n = norm(s), compact = n.replace(/\s/g, '');
+    if (/https?|:\/\/|www\.|tel:|mailto:|[a-z0-9-]+\.[a-z]{2,}/.test(compact)) return 'link';
+    if (/@/.test(n)) return 'mail';
+    if (/\+\d/.test(compact)) return 'phone';
+    var runs = n.match(/\d[\d\s()\-]*\d/g) || [];
+    for (var i = 0; i < runs.length; i++) if (runs[i].replace(/\D/g, '').length >= 10) return 'phone';
+    return '';
+  }
+  function pad(n, w) { n = String(n); while (n.length < (w || 2)) n = '0' + n; return n; }
+
+  // 日付・時刻（日本時間）
+  function parseDate(s) { // 'YYYY-MM-DD' か 'YYYYMMDD' → {y,m,d} / null
+    var m = /^(\d{4})-?(\d{2})-?(\d{2})$/.exec(String(s == null ? '' : s));
+    if (!m) return null;
+    var y = +m[1], mo = +m[2], d = +m[3];
+    if (y < 2000 || y > 2100 || mo < 1 || mo > 12 || d < 1) return null;
+    var t = new Date(Date.UTC(y, mo - 1, d));
+    if (t.getUTCFullYear() !== y || t.getUTCMonth() !== mo - 1 || t.getUTCDate() !== d) return null;
+    return { y: y, m: mo, d: d };
+  }
+  function parseTime(s) { // 'HH:MM' か 'HHMM'
+    var m = /^(\d{2}):?(\d{2})$/.exec(String(s == null ? '' : s));
+    if (!m) return null;
+    var h = +m[1], mi = +m[2];
+    if (h > 23 || mi > 59) return null;
+    return { h: h, mi: mi };
+  }
+  // 日本時間の年月日時分 → その瞬間のミリ秒
+  function jstMs(d, t, addMin) { return Date.UTC(d.y, d.m - 1, d.d, t.h, t.mi + (addMin || 0)) - JST; }
+  // ミリ秒 → 日本時間の部品
+  function jstParts(ms) { var x = new Date(ms + JST); return { y: x.getUTCFullYear(), m: x.getUTCMonth() + 1, d: x.getUTCDate(), h: x.getUTCHours(), mi: x.getUTCMinutes(), wd: x.getUTCDay() }; }
+  function utcStamp(ms) { var x = new Date(ms); return '' + x.getUTCFullYear() + pad(x.getUTCMonth() + 1) + pad(x.getUTCDate()) + 'T' + pad(x.getUTCHours()) + pad(x.getUTCMinutes()) + pad(x.getUTCSeconds()) + 'Z'; }
+  function todayJst(now) { var p = jstParts(now); return { y: p.y, m: p.m, d: p.d }; }
+  function dateKey(d) { return d.y * 10000 + d.m * 100 + d.d; }
+  function isoDate(d) { return d.y + '-' + pad(d.m) + '-' + pad(d.d); }
+  // サンプルの日付: 今日から3週間後以降で、いちばん近い土曜日
+  function sampleDate(now) {
+    var t = todayJst(now), ms = Date.UTC(t.y, t.m - 1, t.d) + 21 * DAY;
+    while (new Date(ms).getUTCDay() !== 6) ms += DAY;
+    var x = new Date(ms); return { y: x.getUTCFullYear(), m: x.getUTCMonth() + 1, d: x.getUTCDate() };
+  }
+
+  function emptyDraft() { return { shop: '', date: '', time: '', dur: '60', note: '', remind: '1' }; }
+  function sampleDraft(now) {
+    return { shop: 'サンプル美容室', date: isoDate(sampleDate(now)), time: '14:00', dur: '90', note: 'カットとカラーの予定です｜前回の仕上がり写真があればお見せください', remind: '1' };
+  }
+  // 下書きとして保存するもの（日付・時刻は保存しない＝前のお客さんの日時を送る取り違えを防ぐ）
+  function storable(d) { return { shop: d.shop, dur: d.dur, note: d.note, remind: d.remind }; }
+  function sanitizeDraft(o) {
+    var d = emptyDraft();
+    if (!o || typeof o !== 'object') return d;
+    if (typeof o.shop === 'string') d.shop = o.shop.slice(0, 100);
+    if (typeof o.note === 'string') d.note = o.note.slice(0, 300);
+    if (DURS.indexOf(+o.dur) >= 0) d.dur = String(+o.dur);
+    if (/^[0-3]$/.test(String(o.remind))) d.remind = String(o.remind);
+    return d;
+  }
+
+  // 入力 → 設定。外れた点は日本語の文で errors に入れる
+  function toConfig(d, now) {
+    var errs = [];
+    function txt(v, max, label, req) {
+      var s = clean(v);
+      if (req && !s) errs.push(label + 'を入れてください');
+      if (cpLen(s) > max) errs.push(label + 'は' + max + '字までです');
+      var b = blockedReason(s);
+      if (b) errs.push(label + 'に' + (b === 'link' ? 'リンク' : b === 'mail' ? 'メールアドレス（@）' : '電話番号') + 'は入れられません');
+      return s;
+    }
+    var shop = txt(d.shop, LIM.shop, '店名', true);
+    var date = parseDate(d.date), time = parseTime(d.time);
+    if (!clean(d.date)) errs.push('予約日を入れてください');
+    else if (!date) errs.push('予約日を確かめてください');
+    else {
+      var t = todayJst(now), lim = { y: t.y + 2, m: t.m, d: t.d };
+      if (dateKey(date) < dateKey(t)) errs.push('予約日が今日より前になっています');
+      else if (dateKey(date) > dateKey(lim)) errs.push('予約日は2年後までにしてください');
+    }
+    if (!clean(d.time)) errs.push('開始時刻を入れてください');
+    else if (!time) errs.push('開始時刻を確かめてください');
+    var dur = +d.dur;
+    if (DURS.indexOf(dur) < 0) errs.push('所要時間を選んでください');
+    var rem = /^[0-3]$/.test(String(d.remind)) ? +d.remind : 0;
+    var note = txt(d.note, LIM.note, '持ち物・ひと言', false);
+    if (errs.length) return { cfg: null, errors: errs };
+    return { cfg: { shop: shop, date: '' + date.y + pad(date.m) + pad(date.d), time: pad(time.h) + pad(time.mi), dur: dur, note: note, remind: rem }, errors: [] };
+  }
+  function fromConfig(c) {
+    var d = parseDate(c.date), t = parseTime(c.time);
+    return { shop: c.shop, date: isoDate(d), time: pad(t.h) + ':' + pad(t.mi), dur: String(c.dur), note: c.note, remind: String(c.remind) };
+  }
+
+  // 設定 ⇄ URLの # 以降
+  function b64urlEncode(str) {
+    var bytes = new TextEncoder().encode(str), bin = '';
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  }
+  function b64urlDecode(s) {
+    var b = s.replace(/-/g, '+').replace(/_/g, '/');
+    while (b.length % 4) b += '=';
+    var bin = atob(b), bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  }
+  function encode(c) { return 'v1=' + b64urlEncode(JSON.stringify([1, c.shop, c.date, c.time, c.dur, c.note, c.remind])); }
+  // LINEのアプリ内ブラウザで開かれたとき、端末の標準ブラウザで開き直させる（LINEの仕組み）
+  function makeUrl(base, c) { return base + '?openExternalBrowser=1#' + encode(c); }
+  function isStr(v, max, req) { return typeof v === 'string' && cpLen(v) <= max && (!req || v.length > 0) && v === clean(v) && !blockedReason(v); }
+  function fromArray(a) {
+    if (!Array.isArray(a) || a.length !== 7 || a[0] !== 1) return null;
+    if (!isStr(a[1], LIM.shop, true) || !isStr(a[5], LIM.note)) return null;
+    if (typeof a[2] !== 'string' || !/^\d{8}$/.test(a[2]) || !parseDate(a[2])) return null;
+    if (typeof a[3] !== 'string' || !/^\d{4}$/.test(a[3]) || !parseTime(a[3])) return null;
+    if (typeof a[4] !== 'number' || DURS.indexOf(a[4]) < 0) return null;
+    if (typeof a[6] !== 'number' || !Number.isInteger(a[6]) || a[6] < 0 || a[6] > 3) return null;
+    return { shop: a[1], date: a[2], time: a[3], dur: a[4], note: a[5], remind: a[6] };
+  }
+  function decodeHash(h) {
+    try {
+      h = String(h == null ? '' : h).replace(/^#/, '');
+      if (h.length > HASH_MAX) return null;
+      var m = /^v1=([A-Za-z0-9_-]+)$/.exec(h);
+      if (!m) return null;
+      return fromArray(JSON.parse(b64urlDecode(m[1])));
+    } catch (e) { return null; }
+  }
+
+  // 予定の時刻
+  function times(c) {
+    var d = parseDate(c.date), t = parseTime(c.time);
+    var s = jstMs(d, t, 0), e = jstMs(d, t, c.dur);
+    return { start: s, end: e, sp: jstParts(s), ep: jstParts(e) };
+  }
+  function hm(p) { return p.h + ':' + pad(p.mi); }
+  function display(c) {
+    var x = times(c), sp = x.sp, ep = x.ep;
+    var nextDay = dateKey(ep) !== dateKey(sp);
+    return {
+      date: sp.y + '年' + sp.m + '月' + sp.d + '日（' + WD[sp.wd] + '）',
+      time: hm(sp) + '〜' + (nextDay ? '翌' : '') + hm(ep) + '（' + c.dur + '分）'
+    };
+  }
+  function isPast(c, now) { return times(c).start < now; }
+  function title(c) { return c.shop + ' ご予約'; }
+  var FIXED_NOTE = 'このリンクから予約の変更はできません。変更はお店へ直接ご連絡ください';
+  function details(c) { return (c.note ? c.note + '\n' : '') + '（' + FIXED_NOTE + '）'; }
+
+  // .ics（RFC 5545）
+  function icsEscape(s) { return String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r\n|\r|\n/g, '\\n'); }
+  function fold(line) { // 75オクテットごとに折り返す（UTF-8の文字の途中で切らない）
+    var out = [], cur = '', curB = 0, limit = 75;
+    Array.from(line).forEach(function (ch) {
+      var b = new TextEncoder().encode(ch).length;
+      if (curB + b > limit) { out.push(cur); cur = ' '; curB = 1; limit = 75; }
+      cur += ch; curB += b;
+    });
+    out.push(cur);
+    return out.join('\r\n');
+  }
+  function hash32(s) { var h = 0x811c9dc5; var b = new TextEncoder().encode(s); for (var i = 0; i < b.length; i++) { h ^= b[i]; h = Math.imul(h, 0x01000193) >>> 0; } return ('0000000' + h.toString(16)).slice(-8); }
+  function uid(c) { return hash32(JSON.stringify([c.shop, c.date, c.time, c.dur])) + '-' + c.date + c.time + '@next-visit-link'; }
+  function ics(c, now) {
+    var x = times(c), L = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//MICHI AI WORKS//next-visit-link//JA', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+      'BEGIN:VEVENT', 'UID:' + uid(c), 'DTSTAMP:' + utcStamp(now), 'DTSTART:' + utcStamp(x.start), 'DTEND:' + utcStamp(x.end),
+      'SUMMARY:' + icsEscape(title(c)), 'DESCRIPTION:' + icsEscape(details(c))
+    ];
+    var r = REMINDS[c.remind];
+    if (r && r.trigger) L.push('BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + icsEscape(title(c)), 'TRIGGER:' + r.trigger, 'END:VALARM');
+    L.push('END:VEVENT', 'END:VCALENDAR');
+    return L.map(fold).join('\r\n') + '\r\n';
+  }
+  function icsFilename(c) { return 'next-visit-' + c.date + '-' + c.time + '.ics'; }
+  function googleUrl(c) {
+    var x = times(c);
+    return 'https://calendar.google.com/calendar/render?action=TEMPLATE' +
+      '&text=' + encodeURIComponent(title(c)) +
+      '&dates=' + utcStamp(x.start) + '/' + utcStamp(x.end) +
+      '&details=' + encodeURIComponent(details(c)) +
+      '&ctz=Asia%2FTokyo';
+  }
+
+  // 端末の判定（UA文字列とタッチ点数だけで決める純関数）
+  // ios-safari: blobの本物のリンクを直接タップ／ios-other: iPhoneのChrome等／ios-inapp: LINE等のアプリ内ブラウザ／android／other
+  function platformOf(ua, maxTouchPoints) {
+    ua = String(ua || '');
+    var ipad = /Macintosh/.test(ua) && (maxTouchPoints | 0) > 1;
+    var ios = /iPhone|iPad|iPod/.test(ua) || ipad;
+    if (ios) {
+      var device = /iPhone|iPod/.test(ua) ? 'iPhone' : 'iPad';
+      if (/\bLine\/|Instagram|FBAN|FBAV|FBIOS|Twitter|MicroMessenger|GSA\/|YJApp|KAKAOTALK/i.test(ua) || /(iPhone|iPod|iPad).*AppleWebKit(?!.*Safari)/i.test(ua)) return { kind: 'ios-inapp', device: device };
+      if (/CriOS|FxiOS|EdgiOS|OPiOS|OPT\/|YaBrowser|DuckDuckGo/i.test(ua) || !/Safari/.test(ua)) return { kind: 'ios-other', device: device };
+      return { kind: 'ios-safari', device: device };
+    }
+    if (/Android/i.test(ua)) return { kind: 'android', device: 'Android' };
+    return { kind: 'other', device: '' };
+  }
+
+  return {
+    KEY: KEY, LIM: LIM, DURS: DURS, REMINDS: REMINDS, HASH_MAX: HASH_MAX, FIXED_NOTE: FIXED_NOTE,
+    clean: clean, cpLen: cpLen, blockedReason: blockedReason, parseDate: parseDate, parseTime: parseTime, todayJst: todayJst, sampleDate: sampleDate,
+    emptyDraft: emptyDraft, sampleDraft: sampleDraft, storable: storable, sanitizeDraft: sanitizeDraft, toConfig: toConfig, fromConfig: fromConfig,
+    encode: encode, makeUrl: makeUrl, decodeHash: decodeHash, times: times, display: display, isPast: isPast, title: title, details: details,
+    ics: ics, icsEscape: icsEscape, fold: fold, uid: uid, icsFilename: icsFilename, googleUrl: googleUrl, utcStamp: utcStamp, platformOf: platformOf
+  };
+})();
+if (typeof module !== 'undefined') module.exports = NV;
+</script>
+
+<script id="ui">
+(function () {
+  var app = document.getElementById('app');
+  var uid = 0, blobs = [];
+  var PLAT = NV.platformOf(navigator.userAgent, navigator.maxTouchPoints);
+
+  function h(tag, a, kids) {
+    var e = document.createElement(tag);
+    if (a) Object.keys(a).forEach(function (k) {
+      var v = a[k];
+      if (v == null || v === false) return;
+      if (k === 'class') e.className = v;
+      else if (k === 'text') e.textContent = v;
+      else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), v);
+      else if (v === true) e.setAttribute(k, '');
+      else e.setAttribute(k, v);
+    });
+    (kids || []).forEach(function (c) { if (c != null) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return e;
+  }
+  function baseUrl() { return location.href.split('#')[0].split('?')[0]; }
+
+  function copyText(text, done) {
+    function fallback() {
+      var ok = false;
+      try {
+        var ta = document.createElement('textarea');
+        ta.value = text; ta.setAttribute('readonly', '');
+        ta.style.cssText = 'position:fixed;top:0;left:0;opacity:0;font-size:16px';
+        document.body.appendChild(ta); ta.select(); ta.setSelectionRange(0, text.length);
+        ok = document.execCommand('copy'); document.body.removeChild(ta);
+      } catch (e) { ok = false; }
+      done(ok);
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      try { navigator.clipboard.writeText(text).then(function () { done(true); }, fallback); } catch (e) { fallback(); }
+    } else fallback();
+  }
+
+  // .icsの本物のリンク（iOSのSafariでは、合成クリックではなく利用者が直接タップする必要があるため、最初からリンクとして置く）
+  function icsLink(cfg, label, primary) {
+    var text = NV.ics(cfg, Date.now()), href;
+    try { href = URL.createObjectURL(new Blob([text], { type: 'text/calendar;charset=utf-8' })); blobs.push(href); }
+    catch (e) { href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(text); }
+    return h('a', { class: 'btn' + (primary ? ' primary' : ''), href: href, download: NV.icsFilename(cfg), target: '_self', rel: 'noopener', text: label });
+  }
+  function releaseBlobs() { blobs.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) { } }); blobs = []; }
+
+  /* ---------------- 開く画面（お客さん側・プレビュー兼用） ---------------- */
+  function renderView(root, cfg, preview) {
+    root.textContent = '';
+    var dsp = NV.display(cfg);
+    var wrap = h('div', { class: 'view' });
+    wrap.appendChild(h('div', { class: 'notice', text: 'この画面の内容は、リンクを作ったお店が入力したものです。当サイトはお店とは無関係で、内容の確認もしていません。このページから予約の受付・変更はできません。お金の振込先や個人情報を入力する画面ではありません。' }));
+    wrap.appendChild(h('h2', { class: 'v-shop', text: cfg.shop }));
+    if (NV.isPast(cfg, Date.now())) wrap.appendChild(h('div', { class: 'past', text: 'この予約の日時は過ぎています。' }));
+    wrap.appendChild(h('div', { class: 'appt' }, [
+      h('p', { class: 'k', text: '次回のご予約（日本時間）' }),
+      h('p', { class: 'd', text: dsp.date }),
+      h('p', { class: 't', text: dsp.time }),
+      cfg.note ? h('p', { class: 'n', text: cfg.note }) : null
+    ]));
+
+    var stack = h('div', { class: 'stack' });
+    var gLink = h('a', { class: 'btn', href: NV.googleUrl(cfg), target: '_blank', rel: 'noopener noreferrer', text: 'Googleカレンダーに追加' });
+    var k = PLAT.kind;
+    if (preview) {
+      stack.appendChild(h('span', { class: 'btn primary', 'aria-disabled': 'true', text: 'iPhoneのカレンダーに追加' }));
+      stack.appendChild(h('span', { class: 'btn', 'aria-disabled': 'true', text: 'Googleカレンダーに追加' }));
+    } else if (k === 'ios-safari') {
+      stack.appendChild(icsLink(cfg, PLAT.device + 'のカレンダーに追加', true));
+      stack.appendChild(gLink);
+    } else if (k === 'ios-other' || k === 'ios-inapp') {
+      var as = h('div', { class: 'assist' });
+      as.appendChild(h('p', { text: k === 'ios-inapp'
+        ? 'アプリの中のブラウザでは、' + PLAT.device + 'のカレンダーに直接入れられません。Safariで開き直してください。'
+        : 'このブラウザでは、' + PLAT.device + 'のカレンダーに直接入れられません。Safariで開き直してください。' }));
+      as.appendChild(h('p', { class: 'small', text: 'このページのアドレスに予約の内容が入っているので、Safariに貼り付ければ同じ画面が出ます。' }));
+      var cpMsg = h('p', { class: 'okmsg', role: 'status' });
+      var cp = h('button', { type: 'button', class: 'primary', text: 'このページのアドレスをコピー' });
+      cp.addEventListener('click', function () {
+        copyText(location.href, function (ok) { cpMsg.textContent = ok ? 'コピーしました。Safariを開いて、アドレス欄に貼り付けてください。' : 'コピーできませんでした。右下や右上のメニューの「Safariで開く」「ブラウザで開く」を使ってください。'; });
+      });
+      as.appendChild(h('div', { class: 'stack' }, [cp]));
+      as.appendChild(cpMsg);
+      wrap.appendChild(as);
+      stack.appendChild(gLink);
+    } else if (k === 'android') {
+      stack.appendChild(h('a', { class: 'btn primary', href: NV.googleUrl(cfg), target: '_blank', rel: 'noopener noreferrer', text: 'Googleカレンダーに追加' }));
+      stack.appendChild(icsLink(cfg, 'カレンダーに追加（.icsファイル）', false));
+    } else {
+      stack.appendChild(icsLink(cfg, 'カレンダーに追加（.icsファイル）', true));
+      stack.appendChild(gLink);
+    }
+    wrap.appendChild(stack);
+    wrap.appendChild(h('p', { class: 'small', text: '「Googleカレンダーに追加」を押すと、Googleのページが開き、予定の内容が渡ります。' }));
+
+    var help = h('details', { class: 'panel' });
+    help.appendChild(h('summary', { text: 'うまく追加できないとき' }));
+    help.appendChild(h('ul', null, [
+      h('li', { text: 'iPhone・iPadは、Safariで開いてから「カレンダーに追加」を押してください。' }),
+      h('li', { text: 'Googleカレンダーを使っている方は「Googleカレンダーに追加」を押してください。' }),
+      h('li', { text: 'どちらもできないときは、上の日時をご自分のカレンダーやメモに書き写してください。' })
+    ]));
+    wrap.appendChild(help);
+    wrap.appendChild(h('p', { class: 'small', text: NV.FIXED_NOTE + '。' }));
+    root.appendChild(wrap);
+  }
+
+  /* ---------------- 作る画面（お店側） ---------------- */
+  var storageOk = true;
+  function loadDraft() {
+    try { var s = localStorage.getItem(NV.KEY); if (s) return NV.sanitizeDraft(JSON.parse(s)); } catch (e) { }
+    return NV.emptyDraft();
+  }
+  function saveDraft(d) { try { localStorage.setItem(NV.KEY, JSON.stringify(NV.storable(d))); } catch (e) { storageOk = false; } }
+
+  function renderMake() {
+    document.title = '次回予約カレンダーリンク';
+    app.textContent = '';
+    var draft = loadDraft(), showErrors = false, timer = null;
+    [
+      h('h1', { text: '次回予約カレンダーリンク' }),
+      h('p', { class: 'lead', text: '次回の予約の日時と店名を入れて、リンクを作ります。お客さんがそのリンクを開いてボタンを押すと、自分のスマホのカレンダーに予定が入ります。' }),
+      h('ul', { class: 'notes' }, [
+        h('li', { text: 'お客さんのお名前・電話番号・メールアドレスは入れないでください（入れられないようにしています）。' }),
+        h('li', { text: 'このページは予約の受付や管理をしません。予約は、いつもの台帳で管理してください。' }),
+        h('li', { text: '入力した内容は、この端末のブラウザで処理します。店名・所要時間・ひと言は次回のために端末に残ります（日付と時刻は残しません）。' })
+      ])
+    ].forEach(function (e) { app.appendChild(e); });
+    if (!storageOk) app.appendChild(h('div', { class: 'errors', text: 'この端末では入力を保存できません。ページを閉じると入力が消えます。' }));
+
+    var layout = h('div', { class: 'layout' }), left = h('div'), right = h('div', { class: 'sticky' });
+    layout.appendChild(left); layout.appendChild(right); app.appendChild(layout);
+    var errBox = h('div', { class: 'errors', role: 'alert' }); errBox.hidden = true;
+    var resultBox = h('div', { class: 'panel' }); resultBox.hidden = true;
+    var pvRoot = h('div');
+
+    function changed() {
+      saveDraft(draft);
+      resultBox.hidden = true;
+      if (showErrors) refreshErrors();
+      clearTimeout(timer); timer = setTimeout(renderPreview, 150);
+    }
+    function refreshErrors() {
+      var r = NV.toConfig(draft, Date.now());
+      errBox.textContent = '';
+      if (r.errors.length) {
+        errBox.hidden = false;
+        errBox.appendChild(h('strong', { text: '次の点を直してください' }));
+        errBox.appendChild(h('ul', null, r.errors.map(function (m) { return h('li', { text: m }); })));
+      } else errBox.hidden = true;
+      return r;
+    }
+    function renderPreview() {
+      var r = NV.toConfig(draft, Date.now());
+      pvRoot.textContent = '';
+      if (!r.cfg) { pvRoot.appendChild(h('p', { class: 'small', text: '入力が整うと、ここにお客さんから見える画面が出ます。' + (r.errors.length ? '（いまの状態: ' + r.errors[0] + '）' : '') })); return; }
+      var inner = h('div'); pvRoot.appendChild(inner); renderView(inner, r.cfg, true);
+    }
+    function field(key, label, hint, input) {
+      var id = 'f' + (++uid); input.id = id;
+      input.value = draft[key];
+      input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', function () { draft[key] = input.value; changed(); });
+      if (input.tagName !== 'SELECT' && input.type !== 'text') input.addEventListener('change', function () { draft[key] = input.value; changed(); });
+      return h('div', null, [h('label', { class: 'f', for: id }, [label, hint ? h('span', { class: 'hint', text: ' ' + hint }) : null]), input]);
+    }
+    function select(opts) { var s = h('select'); opts.forEach(function (o) { s.appendChild(h('option', { value: o[0], text: o[1] })); }); return s; }
+
+    var form = h('div', { class: 'panel' });
+    left.appendChild(h('div', { class: 'btns' }, [
+      h('button', { type: 'button', text: 'サンプルを入れる', onclick: function () {
+        if ((NV.clean(draft.shop) || NV.clean(draft.date)) && !confirm('いまの入力を、サンプルに置き換えます。よろしいですか？')) return;
+        draft = NV.sampleDraft(Date.now()); buildForm(); changed();
+      } }),
+      h('button', { type: 'button', text: '入力を空にする', onclick: function () {
+        if (!confirm('入力をすべて消します。よろしいですか？')) return;
+        draft = NV.emptyDraft(); showErrors = false; errBox.hidden = true; buildForm(); changed();
+      } })
+    ]));
+    left.appendChild(form);
+    function buildForm() {
+      form.textContent = '';
+      form.appendChild(field('shop', '店名', '（30字まで）', h('input', { type: 'text', maxlength: NV.LIM.shop, autocomplete: 'off' })));
+      form.appendChild(h('div', { class: 'two' }, [
+        field('date', '予約日', '', h('input', { type: 'date' })),
+        field('time', '開始時刻', '', h('input', { type: 'time', step: 300 }))
+      ]));
+      form.appendChild(field('dur', '所要時間', '', select(NV.DURS.map(function (m) { return [String(m), m + '分']; }))));
+      form.appendChild(field('note', '持ち物・ひと言', '（任意・80字まで）', h('input', { type: 'text', maxlength: NV.LIM.note, autocomplete: 'off', placeholder: '例 カットとカラーの予定です' })));
+      form.appendChild(field('remind', 'お知らせ', '（iPhoneのカレンダーなど.icsで追加したときだけ）', select(NV.REMINDS.map(function (r, i) { return [String(i), r.label]; }))));
+      form.appendChild(h('p', { class: 'small', text: 'リンク・メールアドレス・電話番号は入れられません。日時は日本時間です。Googleカレンダーのお知らせは、お客さんのGoogleカレンダーの設定に従います。' }));
+    }
+    buildForm();
+
+    var lenEl = h('p', { class: 'len' }), urlTa = h('textarea', { readonly: true, rows: 4, class: 'urlbox', 'aria-label': '共有用URL' });
+    var cpBtn = h('button', { type: 'button', class: 'primary', text: 'URLをコピー' });
+    var shBtn = h('button', { type: 'button', text: '共有' });
+    var cpMsg = h('p', { class: 'okmsg', role: 'status' });
+    shBtn.hidden = typeof navigator.share !== 'function';
+    var curUrl = '';
+    cpBtn.addEventListener('click', function () {
+      copyText(curUrl, function (ok) {
+        if (ok) cpMsg.textContent = 'コピーしました。お客さんに送ってください。';
+        else { cpMsg.textContent = 'コピーできませんでした。上のURLを長押しして、コピーしてください。'; urlTa.focus(); urlTa.select(); urlTa.setSelectionRange(0, curUrl.length); }
+      });
+    });
+    shBtn.addEventListener('click', function () {
+      var p; try { p = navigator.share({ url: curUrl }); } catch (e) { cpMsg.textContent = '共有できませんでした。URLをコピーしてください。'; return; }
+      if (p && p.catch) p.catch(function (e) { if (!e || e.name !== 'AbortError') cpMsg.textContent = '共有できませんでした。URLをコピーしてください。'; });
+    });
+    resultBox.appendChild(h('h3', { text: 'お客さんに送るリンク' }));
+    resultBox.appendChild(lenEl); resultBox.appendChild(urlTa);
+    resultBox.appendChild(h('div', { class: 'btns' }, [cpBtn, shBtn]));
+    resultBox.appendChild(cpMsg);
+    resultBox.appendChild(h('p', { class: 'small', text: 'LINE・メール・DMなど、いつもの連絡手段で送ってください。作ったリンクは保存されません。' }));
+
+    var make = h('button', { type: 'button', class: 'primary', text: 'リンクを作る' });
+    make.addEventListener('click', function () {
+      showErrors = true;
+      var r = refreshErrors();
+      if (!r.cfg) { resultBox.hidden = true; if (errBox.scrollIntoView) errBox.scrollIntoView({ block: 'nearest' }); return; }
+      curUrl = NV.makeUrl(baseUrl(), r.cfg);
+      lenEl.textContent = 'URLの長さ: ' + Array.from(curUrl).length + '文字';
+      urlTa.value = curUrl; cpMsg.textContent = '';
+      resultBox.hidden = false;
+      if (resultBox.scrollIntoView) resultBox.scrollIntoView({ block: 'nearest' });
+    });
+    left.appendChild(h('div', { class: 'btns' }, [make]));
+    left.appendChild(errBox);
+    right.appendChild(resultBox);
+    right.appendChild(h('h2', { text: 'お客さんにはこう見えます（プレビュー）' }));
+    right.appendChild(h('p', { class: 'small', text: 'プレビューのボタンは押せません。実際の動きは、作ったリンクを開いて確かめてください。' }));
+    right.appendChild(pvRoot);
+    renderPreview();
+  }
+
+  /* ---------------- リンクを開いたとき ---------------- */
+  function renderViewPage(cfg) {
+    document.title = cfg.shop + '｜次回のご予約';
+    app.textContent = '';
+    var page = h('div', { class: 'viewpage' }); app.appendChild(page);
+    var root = h('div'); page.appendChild(root);
+    renderView(root, cfg, false);
+    page.appendChild(h('button', { type: 'button', class: 'linklike', text: '自分のお店用の予約リンクを作る', onclick: goMake }));
+  }
+  function renderBroken() {
+    document.title = '次回予約カレンダーリンク';
+    app.textContent = '';
+    app.appendChild(h('h1', { text: 'リンクを開けませんでした' }));
+    app.appendChild(h('div', { class: 'errors', text: 'リンクが壊れているか、対応していない形式です。リンクを送ってくれたお店に、もう一度確認してください。' }));
+    app.appendChild(h('button', { type: 'button', text: '予約リンクを作る画面へ', onclick: goMake }));
+  }
+  function goMake() {
+    try { history.pushState(null, '', baseUrl()); } catch (e) { location.hash = ''; }
+    route();
+  }
+  function route() {
+    releaseBlobs();
+    var hash = location.hash;
+    if (!hash || hash === '#') { renderMake(); return; }
+    var cfg = NV.decodeHash(hash);
+    if (cfg) renderViewPage(cfg); else renderBroken();
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener('hashchange', route);
+  route();
+})();
+</script>
+<script defer src="https://static.cloudflareinsights.com/beacon.min.js"
+        data-cf-beacon='{"token": "b4c9f7e78daf4edb84ef52b88633f649"}'></script>
+</body>
+</html>
