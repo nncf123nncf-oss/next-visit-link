@@ -76,9 +76,9 @@ const bads = {
 Object.keys(bads).forEach(k => eq('S5 ' + k, NV.decodeHash(bads[k]), null));
 
 // S6 止める文字
-['http://x', 'www.x', 'example.com', 'ｅｘａｍｐｌｅ．ｃｏｍ', 'a@b', 'a＠b', '090-1234-5678', '09012345678', '０９０ １２３４ ５６７８', '090ー1234ー5678', '+81 90', 'tel:1']
+['http://x', 'www.x', 'example.com', 'ｅｘａｍｐｌｅ．ｃｏｍ', 'a@b', 'a＠b', '090-1234-5678', '09012345678', '０９０ １２３４ ５６７８', '090ー1234ー5678', '+81 90 1234 5678', 'tel:1', '090.1234.5678', '090/1234/5678', 'ネイル.com', 'サロン.jp', 'example . com']
   .forEach(s => eq('S6 block ' + s, !!NV.blockedReason(s), true));
-['11月14日 14:00', '3回目', '2026年11月14日', 'カット＋カラー', '10:00〜11:30', '1,000円', '前回の写真', '第2・第4土曜']
+['11月14日 14:00', '3回目', '2026年11月14日', 'カット＋カラー', '10:00〜11:30', '1,000円', '前回の写真', '第2・第4土曜', 'トリートメント+500円', 'Re.Born', 'M.Nail', 'Thanks. See you', 'Thanks. Come again', '3.5cm']
   .forEach(s => eq('S6 allow ' + s, NV.blockedReason(s), ''));
 eq('S6 shop phone error', cfgOf({ shop: '店 03-1234-5678', date: '2026-11-01', time: '10:00', dur: '60' }).errors, ['店名に電話番号は入れられません']);
 eq('S6 note mail error', cfgOf({ shop: 'A', date: '2026-11-01', time: '10:00', dur: '60', note: 'x@y.jp' }).errors, ['持ち物・ひと言にリンクは入れられません']);

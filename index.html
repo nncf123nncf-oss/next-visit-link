@@ -112,12 +112,15 @@ var NV = (function () {
       .replace(/[\u2010-\u2015\u2212\u30fc\uff70]/g, '-').replace(/[。｡]/g, '.');
   }
   // リンク・メールアドレス・電話番号らしい文字を見つける（お客さんの連絡先や外部への誘導を入れさせない）
+  var TLD = '(?:com|net|org|jp|me|io|co|info|biz|xyz|app|dev|link|page|shop|site|online|tokyo|ly|gl|to|cc|tv|us|uk|ne|or|ac|go)';
+  var RE_DOMAIN = new RegExp('[^\\s.]+\\.' + TLD + '(?![a-z])');
   function blockedReason(s) {
     var n = norm(s), compact = n.replace(/\s/g, '');
-    if (/https?|:\/\/|www\.|tel:|mailto:|[a-z0-9-]+\.[a-z]{2,}/.test(compact)) return 'link';
+    // 点の前が日本語のドメイン（ネイル.com）も止める。点の後ろは既知の末尾だけにして、M.Nail のような店名は通す
+    if (/https?|:\/\/|www\.|tel:|mailto:/.test(compact) || RE_DOMAIN.test(n) || RE_DOMAIN.test(compact)) return 'link';
     if (/@/.test(n)) return 'mail';
-    if (/\+\d/.test(compact)) return 'phone';
-    var runs = n.match(/\d[\d\s()\-]*\d/g) || [];
+    if (/\+\d[\d\s().\/_\-]{8,}/.test(n)) return 'phone';
+    var runs = n.match(/\d[\d\s().\/_\-]*\d/g) || [];
     for (var i = 0; i < runs.length; i++) if (runs[i].replace(/\D/g, '').length >= 10) return 'phone';
     return '';
   }
@@ -363,11 +366,12 @@ if (typeof module !== 'undefined') module.exports = NV;
   }
 
   // .icsの本物のリンク（iOSのSafariでは、合成クリックではなく利用者が直接タップする必要があるため、最初からリンクとして置く）
-  function icsLink(cfg, label, primary) {
+  // noDownload: download 属性を付けない版（iPhoneで「ダウンロード」になってカレンダーの画面が出ないときの予備）
+  function icsLink(cfg, label, primary, noDownload) {
     var text = NV.ics(cfg, Date.now()), href;
     try { href = URL.createObjectURL(new Blob([text], { type: 'text/calendar;charset=utf-8' })); blobs.push(href); }
     catch (e) { href = 'data:text/calendar;charset=utf-8,' + encodeURIComponent(text); }
-    return h('a', { class: 'btn' + (primary ? ' primary' : ''), href: href, download: NV.icsFilename(cfg), target: '_self', rel: 'noopener', text: label });
+    return h('a', { class: 'btn' + (primary ? ' primary' : ''), href: href, download: noDownload ? null : NV.icsFilename(cfg), target: '_self', rel: 'noopener', text: label });
   }
   function releaseBlobs() { blobs.forEach(function (u) { try { URL.revokeObjectURL(u); } catch (e) { } }); blobs = []; }
 
@@ -397,10 +401,8 @@ if (typeof module !== 'undefined') module.exports = NV;
       stack.appendChild(gLink);
     } else if (k === 'ios-other' || k === 'ios-inapp') {
       var as = h('div', { class: 'assist' });
-      as.appendChild(h('p', { text: k === 'ios-inapp'
-        ? 'アプリの中のブラウザでは、' + PLAT.device + 'のカレンダーに直接入れられません。Safariで開き直してください。'
-        : 'このブラウザでは、' + PLAT.device + 'のカレンダーに直接入れられません。Safariで開き直してください。' }));
-      as.appendChild(h('p', { class: 'small', text: 'このページのアドレスに予約の内容が入っているので、Safariに貼り付ければ同じ画面が出ます。' }));
+      as.appendChild(h('p', { text: (k === 'ios-inapp' ? 'アプリの中のブラウザ' : 'このブラウザ') + 'では' + PLAT.device + 'のカレンダーに直接入れられません。Safariで開き直してください。' }));
+      as.appendChild(h('p', { class: 'small', text: 'アドレスをSafariに貼ると、同じ画面が出ます。' }));
       var cpMsg = h('p', { class: 'okmsg', role: 'status' });
       var cp = h('button', { type: 'button', class: 'primary', text: 'このページのアドレスをコピー' });
       cp.addEventListener('click', function () {
@@ -422,6 +424,10 @@ if (typeof module !== 'undefined') module.exports = NV;
 
     var help = h('details', { class: 'panel' });
     help.appendChild(h('summary', { text: 'うまく追加できないとき' }));
+    if (!preview && k === 'ios-safari') {
+      help.appendChild(h('p', { class: 'small', text: '「' + PLAT.device + 'のカレンダーに追加」でカレンダーの画面が出ず、ファイルの保存になったときは、こちらを試してください。' }));
+      help.appendChild(h('div', { class: 'stack' }, [icsLink(cfg, '別の方法でカレンダーを開く', false, true)]));
+    }
     help.appendChild(h('ul', null, [
       h('li', { text: 'iPhone・iPadは、Safariで開いてから「カレンダーに追加」を押してください。' }),
       h('li', { text: 'Googleカレンダーを使っている方は「Googleカレンダーに追加」を押してください。' }),
@@ -433,7 +439,7 @@ if (typeof module !== 'undefined') module.exports = NV;
   }
 
   /* ---------------- 作る画面（お店側） ---------------- */
-  var storageOk = true;
+  var storageOk = (function () { try { localStorage.setItem(NV.KEY + '-probe', '1'); localStorage.removeItem(NV.KEY + '-probe'); return true; } catch (e) { return false; } })();
   function loadDraft() {
     try { var s = localStorage.getItem(NV.KEY); if (s) return NV.sanitizeDraft(JSON.parse(s)); } catch (e) { }
     return NV.emptyDraft();
@@ -534,11 +540,17 @@ if (typeof module !== 'undefined') module.exports = NV;
       var p; try { p = navigator.share({ url: curUrl }); } catch (e) { cpMsg.textContent = '共有できませんでした。URLをコピーしてください。'; return; }
       if (p && p.catch) p.catch(function (e) { if (!e || e.name !== 'AbortError') cpMsg.textContent = '共有できませんでした。URLをコピーしてください。'; });
     });
+    var pastMsg = h('p', { class: 'past', text: 'この日時はもう過ぎています。日付と時刻を確かめてください。' }); pastMsg.hidden = true;
     resultBox.appendChild(h('h3', { text: 'お客さんに送るリンク' }));
+    resultBox.appendChild(pastMsg);
     resultBox.appendChild(lenEl); resultBox.appendChild(urlTa);
     resultBox.appendChild(h('div', { class: 'btns' }, [cpBtn, shBtn]));
     resultBox.appendChild(cpMsg);
     resultBox.appendChild(h('p', { class: 'small', text: 'LINE・メール・DMなど、いつもの連絡手段で送ってください。作ったリンクは保存されません。' }));
+    resultBox.appendChild(h('div', { class: 'btns' }, [h('button', { type: 'button', text: '次のお客さん用に日付と時刻を消す', onclick: function () {
+      draft.date = ''; draft.time = ''; showErrors = false; errBox.hidden = true; buildForm(); changed();
+      var f = form.querySelector('input[type=date]'); if (f) f.focus();
+    } })]));
 
     var make = h('button', { type: 'button', class: 'primary', text: 'リンクを作る' });
     make.addEventListener('click', function () {
@@ -548,6 +560,7 @@ if (typeof module !== 'undefined') module.exports = NV;
       curUrl = NV.makeUrl(baseUrl(), r.cfg);
       lenEl.textContent = 'URLの長さ: ' + Array.from(curUrl).length + '文字';
       urlTa.value = curUrl; cpMsg.textContent = '';
+      pastMsg.hidden = !NV.isPast(r.cfg, Date.now());
       resultBox.hidden = false;
       if (resultBox.scrollIntoView) resultBox.scrollIntoView({ block: 'nearest' });
     });
@@ -569,11 +582,13 @@ if (typeof module !== 'undefined') module.exports = NV;
     renderView(root, cfg, false);
     page.appendChild(h('button', { type: 'button', class: 'linklike', text: '自分のお店用の予約リンクを作る', onclick: goMake }));
   }
-  function renderBroken() {
+  function renderBroken(lost) {
     document.title = '次回予約カレンダーリンク';
     app.textContent = '';
     app.appendChild(h('h1', { text: 'リンクを開けませんでした' }));
-    app.appendChild(h('div', { class: 'errors', text: 'リンクが壊れているか、対応していない形式です。リンクを送ってくれたお店に、もう一度確認してください。' }));
+    app.appendChild(h('div', { class: 'errors', text: lost
+      ? 'リンクの中身（予約の日時）が読み取れませんでした。リンクを送ってもらったアプリの画面に戻り、リンクを長押しして「Safariで開く」「ブラウザで開く」を選んでください。それでも開けないときは、お店に日時を確認してください。'
+      : 'リンクが壊れているか、対応していない形式です。リンクを送ってくれたお店に、もう一度確認してください。' }));
     app.appendChild(h('button', { type: 'button', text: '予約リンクを作る画面へ', onclick: goMake }));
   }
   function goMake() {
@@ -583,7 +598,11 @@ if (typeof module !== 'undefined') module.exports = NV;
   function route() {
     releaseBlobs();
     var hash = location.hash;
-    if (!hash || hash === '#') { renderMake(); return; }
+    if (!hash || hash === '#') {
+      // お客さんに送るリンク（?openExternalBrowser=1 付き）で開かれたのに # 以降が無い＝途中で中身が落ちた。作る画面は出さない
+      if (/[?&]openExternalBrowser=1/.test(location.search)) { renderBroken(true); return; }
+      renderMake(); return;
+    }
     var cfg = NV.decodeHash(hash);
     if (cfg) renderViewPage(cfg); else renderBroken();
     window.scrollTo(0, 0);

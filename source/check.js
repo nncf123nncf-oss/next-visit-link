@@ -26,6 +26,8 @@ const btnTexts = `[...document.querySelectorAll('.view .stack > *')].map(e=>e.ta
   const reqs = [];
   b.on(m => { if (m.method === 'Network.requestWillBeSent') reqs.push(m.params.request.url + ' ' + (m.params.request.postData || '')); });
   await b.send('Network.enable');
+  // 本番の計測に検算の閲覧を混ぜないため、既定では計測ビーコンを止める（送信内容を確かめるときだけ CHECK_BEACON=1）
+  if (!process.env.CHECK_BEACON) await b.send('Network.setBlockedURLs', { urls: ['*cloudflareinsights.com*'] });
   // 1) 作る画面 375px
   await b.open(ORIGIN, 375, 900, 2, true, 'light');
   await b.ev(`localStorage.clear()`); await b.open(ORIGIN, 375, 900, 2, true, 'light');
@@ -92,6 +94,8 @@ const btnTexts = `[...document.querySelectorAll('.view .stack > *')].map(e=>e.ta
 
   // 6) 壊れたリンク・過去
   for (const h of ['#v1=abc', '#v2=xx', '#' + 'x'.repeat(2000)]) { await b.open(ORIGIN + h, 375, 900, 2, true, 'light'); console.log('broken', h.slice(0, 12), await b.ev(`document.querySelector('h1')&&document.querySelector('h1').textContent`), await b.ev(`document.querySelectorAll('.appt').length`)); }
+  await b.open(ORIGIN + '?openExternalBrowser=1', 375, 900, 2, true, 'light');
+  console.log('lost-hash', await b.ev(`document.querySelector('h1').textContent+' / '+document.querySelectorAll('input').length`));
   const past = await b.ev(`'#'+NV.encode({shop:'A',date:'20260101',time:'1000',dur:60,note:'',remind:0})`);
   await b.open(ORIGIN + past, 375, 900, 2, true, 'light');
   console.log('past', await b.ev(`(document.querySelector('.past')||{}).textContent`));
